@@ -180,6 +180,37 @@ app/streamlit_app.py                      pipeline, catalog, ask
 tests/                                    scenario tests T-1 through T-16
 ```
 
+## Next steps
+
+The candidate instructions ask the walkthrough to cover what to do next with more time: refactors, better error handling, and more realistic integrations. The items below are that list for this exercise. The current demo is the 45-minute slice. These are the improvements, in the order they pay off.
+
+### Shortcuts this version takes
+
+- The default load is 2,000 generated events plus the planted purchases. The 6,000,000-row contract is the same SQL path, gated by `WEX_SCALE=1`.
+- `POST /v1/pipelines/{name}/runs` returns 202, then applies the batch in that same request. There is no separate worker.
+- Names are stored in the curated table and masked when a persona reads them. Card numbers are never stored raw.
+- Retrieval is keyword overlap over the glossary and metric catalog. There is no embedding index and no model API key.
+- One DuckDB file and one writer. Readers go through the API.
+
+### Refactors
+
+- Split accept and apply. Persist an `accepted` receipt, return 202, and let a worker commit the batch. A restart then resumes from that receipt instead of relying on the caller to retry the whole file.
+- Keep one writer. Add month pruning on `event_month` so the 6,000,000-row table is not scanned for a single-month question.
+- Move persona masks into views that the compiler is allowed to read, so a new query path cannot skip `present()`.
+
+### Error handling
+
+- Record the landing file checksum on the rejected purchase, and add an operator replay that resubmits only the repaired purchase group.
+- Surface a checksum conflict in the UI as its own state. Today the API keeps the original rows and writes a rejected ledger line. The screen should say the batch was refused and why.
+- Add a readiness failure when a run is left `accepted` with no commit, so `/ready` reports a stuck batch instead of only the catalog version.
+
+### More realistic integrations
+
+- Run `WEX_SCALE=1 pytest -q -m scale` and publish the row count and load time next to the demo numbers.
+- Version the catalog policy. When a steward unmasks a column, write an audit row with the persona, the asset, and the time.
+- Replace keyword retrieval with an offline embedding index over `semantic/glossary.md`, still compiled by the same SQL compiler. The model still does not write SQL.
+- Extend the golden question set so `net_settled_amount`, `transaction_count`, and `benefits_claim_count` are asserted on LangChain, LangGraph, and RAG, including an off-topic question that must not compile.
+
 ## Troubleshooting
 
 **`Descriptors cannot be created directly` when starting Streamlit.** The shell is using Anaconda `(base)` Streamlit. Activate `.venv` and run `which streamlit` before `streamlit run`.
