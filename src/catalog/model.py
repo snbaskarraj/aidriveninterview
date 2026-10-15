@@ -1,0 +1,145 @@
+"""Governance catalog: assets, classes, and persona policy."""
+
+from __future__ import annotations
+
+PERSONAS = (
+    "data_steward",
+    "data_engineer",
+    "business_analyst",
+    "product_manager",
+)
+
+POLICY = {
+    "data_steward": {
+        "PUBLIC": "clear",
+        "INTERNAL": "clear",
+        "CONFIDENTIAL": "clear",
+        "PII_DIRECT": "mask",
+        "PII_SENSITIVE": "label",
+        "PCI": "last4",
+        "PHI": "label",
+    },
+    "data_engineer": {
+        "PUBLIC": "clear",
+        "INTERNAL": "clear",
+        "CONFIDENTIAL": "clear",
+        "PII_DIRECT": "token",
+        "PII_SENSITIVE": "token",
+        "PCI": "token",
+        "PHI": "token",
+    },
+    "business_analyst": {
+        "PUBLIC": "clear",
+        "INTERNAL": "clear",
+        "CONFIDENTIAL": "aggregate",
+        "PII_DIRECT": "mask",
+        "PII_SENSITIVE": "deny",
+        "PCI": "deny",
+        "PHI": "aggregate",
+    },
+    "product_manager": {
+        "PUBLIC": "clear",
+        "INTERNAL": "clear",
+        "CONFIDENTIAL": "aggregate",
+        "PII_DIRECT": "deny",
+        "PII_SENSITIVE": "deny",
+        "PCI": "deny",
+        "PHI": "deny",
+    },
+}
+
+FIELD_CLASS = {
+    "cardholder_name": "PII_DIRECT",
+    "email": "PII_DIRECT",
+    "member_id": "PII_DIRECT",
+    "card_token": "PCI",
+    "pan_last4": "PCI",
+    "ssn_token": "PII_SENSITIVE",
+    "dob": "PII_SENSITIVE",
+    "claim_category": "PHI",
+    "claim_amount": "PHI",
+    "amount": "CONFIDENTIAL",
+}
+
+ASSETS = [
+    {
+        "asset_id": "transaction",
+        "schema_name": "curated",
+        "table_name": "transaction",
+        "title": "Fleet card events",
+        "steward": "Fleet data steward",
+        "owner": "Data engineering",
+    },
+    {
+        "asset_id": "cardholder",
+        "schema_name": "curated",
+        "table_name": "cardholder",
+        "title": "Cardholders",
+        "steward": "Privacy steward",
+        "owner": "Data engineering",
+    },
+    {
+        "asset_id": "customer",
+        "schema_name": "curated",
+        "table_name": "customer",
+        "title": "Fleet and corporate customers",
+        "steward": "Commercial steward",
+        "owner": "Data engineering",
+    },
+    {
+        "asset_id": "merchant",
+        "schema_name": "curated",
+        "table_name": "merchant",
+        "title": "Accepting merchants",
+        "steward": "Network steward",
+        "owner": "Data engineering",
+    },
+    {
+        "asset_id": "benefits_claim",
+        "schema_name": "curated",
+        "table_name": "benefits_claim",
+        "title": "HSA FSA COBRA claims",
+        "steward": "Benefits steward",
+        "owner": "Data engineering",
+    },
+    {
+        "asset_id": "payment",
+        "schema_name": "curated",
+        "table_name": "payment",
+        "title": "Virtual card and ACH payments",
+        "steward": "Payments steward",
+        "owner": "Data engineering",
+    },
+]
+
+COLUMNS = [
+    ("transaction", "source_event_id", "VARCHAR", "INTERNAL", "clear"),
+    ("transaction", "source_system", "VARCHAR", "INTERNAL", "clear"),
+    ("transaction", "purchase_id", "VARCHAR", "INTERNAL", "clear"),
+    ("transaction", "event_kind", "VARCHAR", "INTERNAL", "clear"),
+    ("transaction", "txn_month", "DATE", "PUBLIC", "clear"),
+    ("transaction", "product_family", "VARCHAR", "PUBLIC", "clear"),
+    ("transaction", "auth_status", "VARCHAR", "INTERNAL", "clear"),
+    ("transaction", "amount", "DECIMAL", "CONFIDENTIAL", "aggregate"),
+    ("transaction", "quantity", "DECIMAL", "INTERNAL", "clear"),
+    ("transaction", "cardholder_name", "VARCHAR", "PII_DIRECT", "mask"),
+    ("transaction", "card_token", "VARCHAR", "PCI", "token"),
+    ("transaction", "pan_last4", "VARCHAR", "PCI", "last4"),
+    ("cardholder", "cardholder_name", "VARCHAR", "PII_DIRECT", "mask"),
+    ("cardholder", "email", "VARCHAR", "PII_DIRECT", "mask"),
+    ("cardholder", "ssn_token", "VARCHAR", "PII_SENSITIVE", "token"),
+    ("cardholder", "state", "VARCHAR", "PUBLIC", "clear"),
+    ("customer", "customer_name", "VARCHAR", "INTERNAL", "clear"),
+    ("customer", "region", "VARCHAR", "PUBLIC", "clear"),
+    ("customer", "segment", "VARCHAR", "INTERNAL", "clear"),
+    ("customer", "fleet_size_band", "VARCHAR", "INTERNAL", "bucket"),
+    ("merchant", "merchant_name", "VARCHAR", "INTERNAL", "clear"),
+    ("merchant", "category", "VARCHAR", "PUBLIC", "clear"),
+    ("benefits_claim", "member_token", "VARCHAR", "PII_DIRECT", "token"),
+    ("benefits_claim", "claim_category", "VARCHAR", "PHI", "deny"),
+    ("benefits_claim", "claim_amount", "DECIMAL", "PHI", "aggregate"),
+    ("benefits_claim", "plan_type", "VARCHAR", "INTERNAL", "clear"),
+    ("payment", "rail", "VARCHAR", "INTERNAL", "clear"),
+    ("payment", "amount", "DECIMAL", "CONFIDENTIAL", "aggregate"),
+    ("payment", "invoice_id", "VARCHAR", "INTERNAL", "clear"),
+]

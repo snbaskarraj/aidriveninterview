@@ -1,0 +1,10 @@
+metrics:
+  - id: net_settled_amount
+    description: Net settled amount is the sum of current completion, line, and reversal amounts.
+    synonyms: ["net settled", "settled amount", "net amount"]
+  - id: transaction_count
+    description: Count of current fleet transaction events.
+    synonyms: ["how many transactions", "transaction count", "number of transactions"]
+  - id: benefits_claim_count
+    description: Count of benefits claims without member identifiers.
+    synonyms: ["benefits claims", "how many claims", "claim count"]

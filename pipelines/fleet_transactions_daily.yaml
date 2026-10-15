@@ -1,0 +1,40 @@
+name: fleet_transactions_daily
+engine: duckdb
+mode: batch
+delivery: at_least_once
+scale_min_rows: 6000000
+source:
+  format: json
+  path: data/landing/fleet_transactions.json
+target:
+  schema: curated
+  table: transaction
+load_strategy: merge
+grain: purchase_group
+group_key: [purchase_id]
+keys: [source_system, source_event_id]
+dedup:
+  partition_by: [source_system, source_event_id]
+  order_by: [source_event_ts, ingest_seq]
+transforms:
+  - standardize
+  - derive
+  - conform
+  - protect
+  - hash
+columns:
+  - {source: txn_id, target: source_event_id, op: trim}
+  - {source: src_sys, target: source_system, op: upper}
+  - {source: event_time, target: source_event_ts, op: parse_timestamp, format: "%Y-%m-%dT%H:%M:%SZ"}
+  - {source: event_time, target: txn_month, op: month_start}
+  - {source: amt_cents, target: amount, op: cents_to_decimal}
+  - {source: qty, target: quantity, op: cast_decimal}
+  - {source: product_code, target: product_family, op: map_ref, ref: ref_product}
+  - {source: auth_cd, target: auth_status, op: map_ref, ref: ref_auth}
+  - {source: card_pan, target: card_token, op: tokenize, class: PCI}
+  - {source: card_pan, target: pan_last4, op: last4, class: PCI}
+  - {source: merchant_code, target: merchant_id, op: map_ref, ref: ref_merchant}
+  - {source: purchase_id, target: purchase_id, op: trim}
+  - {source: event_kind, target: event_kind, op: lower}
+  - {source: cardholder_name, target: cardholder_name, op: trim, class: PII_DIRECT}
+tracked_columns: [amount, auth_status, merchant_id, product_family, quantity]
