@@ -669,15 +669,15 @@ Strategy and retry tests use a small fixture with planted duplicate keys. `test_
 
 Order the work so a demo is possible before the walkthrough.
 
-- [ ] Models for pipeline spec, receipt, catalog column, and persona policy.
-- [ ] Transform ops and column trace against an in-memory DuckDB fixture. Tests T-12 and T-13 fail first, then pass.
-- [ ] Strategy SQL and dedup against the conformed fixture. Tests T-1 through T-4 fail first, then pass.
-- [ ] Complex purchase in one DuckDB transaction, then `proof_column` and `proof_purchase`. Tests T-14 through T-16.
-- [ ] Ledger, checksum, and retry. Tests T-6 through T-8.
-- [ ] Catalog seed for the synthetic tables and persona views. Test T-9.
-- [ ] `GET /health`, `GET /ready`, `POST /runs`, `GET /runs/{id}`. Test T-11.
-- [ ] One governed metric through all three engines and one Streamlit page that renders the lineage Mermaid. Test T-10.
-- [ ] Generator contract for 6,000,000 transactions. Test scale when time allows.
+- [x] Models for pipeline spec, receipt, catalog column, and persona policy.
+- [x] Transform ops and column trace against an in-memory DuckDB fixture. Tests T-12 and T-13 fail first, then pass.
+- [x] Strategy SQL and dedup against the conformed fixture. Tests T-1 through T-4 fail first, then pass.
+- [x] Complex purchase in one DuckDB transaction, then `proof_column` and `proof_purchase`. Tests T-14 through T-16.
+- [x] Ledger, checksum, and retry. Tests T-6 through T-8.
+- [x] Catalog seed for the synthetic tables and persona views. Test T-9.
+- [x] `GET /health`, `GET /ready`, `POST /runs`, `GET /runs/{id}`. Test T-11.
+- [x] One governed metric through all three engines and one Streamlit page that renders the lineage Mermaid. Test T-10.
+- [x] Generator contract for 6,000,000 transactions. The scale test is in the suite and is skipped unless `WEX_SCALE=1`. `pytest -q` is 19 passed, 1 skipped.
 
 ### Decisions to explain while coding
 
@@ -704,11 +704,23 @@ tests/               scenario ids from section 5
 
 **Spec changes after coding started**
 
-- None yet. Update this list if a test forces a spec change.
+These are the places the running code differs from the earlier sections. The behavior is the one in this list.
+
+- Load strategies are `UPDATE` then `INSERT`, not `ON CONFLICT`. A row whose `payload_hash` is unchanged is left alone, so a replay does not rewrite it or clear `is_current` on a superseded auth.
+- `POST /v1/pipelines/{name}/runs` still returns 202, and the body is the finished receipt (`committed` or `rejected`). The request applies the batch. It does not return at `accepted` and hand the file to a second process.
+- Persona policy is applied by `present()` on the API response. Compiled SQL is not wrapped in a persona view. Analyst and Product Manager aggregates still come from the one compiler.
+- The scale table's customer, cardholder, claim, and payment counts, and the fraud, interchange, and rebate attributes, are targets. The generator does not produce them. The 6,000,000-row contract stays on `curated.transaction` only.
 
 **Shortcuts taken**
 
-- None yet. Expected shortcut if the clock is short: run strategy tests on a fixture, and keep the 6,000,000-row generate behind the scale marker.
+Same list as the README. These are accepted limits of this slice, not open questions.
+
+- The default load is 2,000 generated events plus the planted purchases (`TX-DUP`, `GRP-77`, `GRP-88`). The 6,000,000-row path is the same SQL, gated by `WEX_SCALE=1`.
+- There is no separate worker. Accept and apply happen in the request that returns 202.
+- Cardholder names are stored in `curated.transaction` and masked when a persona reads them. Raw card numbers are not stored.
+- Retrieval is keyword overlap over `semantic/glossary.md` and `semantic/metrics.yaml`. There is no embedding index and no model API key.
+- One DuckDB file and one writer. Readers use the API.
+- The dimension seed is 12 customers, 8 cardholders, 8 benefits claims, and 6 payments. The planted fraud merchant from the domain notes was not generated, because the coded grain has no fraud column.
 
 ---
 
@@ -763,8 +775,8 @@ Result:
 | --- | --- | --- | --- |
 | Spec | Turn the problem statement and session choices into the design template. | DuckDB, batch, 6,000,000 rows, four strategies, catalog, three engines, Streamlit. | Streaming, dbt, LLM-written SQL, hard delete, heavy health checks. |
 | Design | Add source-to-target transformation beside the load strategies. | Closed op list, column map, masked before/after trace, Mermaid field path. | Free-form SQL in the spec, and storing raw PAN in the trace. |
-| Code | | | |
-| Tests | | | |
+| Code | Implement the design as a thin Python runner: DuckDB SQL for transform and strategy, FastAPI for the API, Streamlit for the three pages. | One transaction for the strategy, rejects, and ledger. Proof SQL for `GRP-77`. Masks in the API. Three engines calling one compiler. | Replaced `ON CONFLICT` with `UPDATE` then `INSERT` so an unchanged hash is a no-op. Kept apply inside the 202 request instead of adding a worker. Escaped `%` as `%%` in the scale `INSERT` after the first test failed on percent-formatting. Used Streamlit `width="stretch"` on 1.50. Left `/health` unable to open DuckDB. |
+| Tests | One test per scenario T-1 through T-16, plus a marked scale test. | Planted `TX-DUP`, `GRP-77`, and `GRP-88`. Replay, checksum conflict, and rollback before commit. Persona matrix. Three engines, one number. Health test monkeypatches `connect` and asserts it is not called. | Left the 6,000,000-row test skipped in `pytest -q`. Dropped the fraud-merchant fixture because the coded grain has no fraud column. The 1,000-row scale path was re-run after the `%` fix. An off-topic question must clarify and must not compile SQL. |
 
 ### With more time
 
